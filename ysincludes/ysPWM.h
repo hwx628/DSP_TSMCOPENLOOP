@@ -11,8 +11,8 @@
 #define period				15000  // 10KHz对应时钟数，TBCLK = SYSCLKOUT(for test)
 #define prediv				0  // 预分频
 //#define limitclk				150  // 预分频后对应的1us时钟数
-#define limitclk				750  // 预分频后对应的1us时钟数
-#define zerolimit				300
+#define limitclk				1500  // 预分频后对应的1us时钟数
+#define zerolimit				600
 #define DT				150   // 死区
 
 /******************************************************************************
