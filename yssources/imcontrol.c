@@ -6,41 +6,45 @@
 /******************************************************************************
 | local variable definitions                          
 |----------------------------------------------------------------------------*/
-//#define period 7500
-/*
-#define period 15000
-#define zerolimit 300
-*/
+double angle = 0;  // 向量与扇区间夹角
+int period_count = 0;  // PWM中断次数
+Uint16 sector = 0;  // SVM扇区
 
 /******************************************************************************
 | global variable definitions                          
 |----------------------------------------------------------------------------*/
+/* 观测值 */
+  // 电压
+double Ud = 40;
 PHASE_ABC uabc = {0, 0, 0};
 PHASE_ALBE ualbe = {0, 0};
+PHASE_DQ udq = {0, 0};
+  // 电流
 PHASE_ABC iabc = {0, 0, 0};
 PHASE_ALBE ialbe = {0, 0};
 PHASE_DQ idq = {0, 0};
+  // 磁链
+double lamdar = 0;
+PHASE_ALBE lamdaralbe = {0, 0};
+double theta = 0;
+  // 转速
+double speed = 0;
+
+/* 给定值 */
+  // 电压
+double u_cmd = 0;  // 线电压幅值
 PHASE_ALBE ualbe_cmd = {0, 0};
 PHASE_DQ udq_cmd = {0, 0};
-double Ud = 0;
+  // 电流
+PHASE_DQ idq_cmd = {0, 0};
+  // 转速
+double spd_cmd = 0;  // 转速给定
+double spd_req = 450;  // 转速设定
 
-double theta = 0;
-double lamdar = 0;
-double n = 0;
-double wr = 0;
-double iqset = 0;
-
-double ud_Isum = 0;
-double uq_Isum = 0;
-double iqset_Isum = 0;
-int period_count = 0;
-
-PHASE_ALBE lamdaralbe = {0, 0};
-double anglek = 0;
-double ualsum = 0;
-double ubesum = 0;
-double ialsum = 0;
-double ibesum = 0;
+/* PI 变量 */
+double idlasterr = 0;
+double iqlasterr = 0;
+double spdlasterr = 0;
 
 /******************************************************************************
 @brief   Coordinate Transform
@@ -118,14 +122,6 @@ double wrCal_M()
   //return 60.0 * (cntFTM1 - temp) / (Z * 0.001);
 }
 
-double wrCal_T()
-{
-}
-
-double wrCal_MT()
-{
-}
-
 double wrCal_lamdar(PHASE_ALBE *lamdaralbe, double *anglek, PHASE_ALBE ualbe, PHASE_ALBE ialbe, double ts) // 未测试
 {
   double angle = 0;
@@ -196,328 +192,178 @@ double Integrator(double paramin, double sum, double ts)
 ******************************************************************************/ 
 void positionSVM(unsigned int *Tinv)
 {
-  double Angle = 0;
-  double theta = 0;
-  int sector = 0;
-  double Dm = 0, Dn = 0, D0 = 0;  // Dutycycle
+    double Dm = 0, Dn = 0, D0 = 0;
+
+    /* V/spd曲线计算电压给定值 */
+    u_cmd = RAMP(VSpdramp, 0, spd_cmd, Voltlimit_H, Voltlimit_L);
   
-  Angle = fmod((10 * pi * (period_count / 1000.0)), (2 * pi));
-  theta = fmod(Angle,1/3.0 * pi);
-  sector = (int)floor( Angle / (1/3.0 * pi)) + 1;
-/*  Dm = M * sin(1/3.0 * pi - theta) / 2.0;
-  Dn = M * sin(theta) / 2.0;
-  D0 = (0.5 - Dm - Dn) / 2.0;*/
-  Dm = M * sin(1/3.0 * pi - theta);
-  Dn = M * sin(theta);
-  D0 = (0.5 - Dm - Dn);
-  Dm = roundn(Dm, 8);
-  Dn = roundn(Dn, 8);
-  D0 = roundn(D0, 8);
-  if (D0 < 0) D0 = 0;
+    /* 扇区及夹角计算 */
+    //theta += 2 * pi * (spd_cmd / 30.0) * 0.0001;  ==========================================================
+    theta += 0.0000418879 * spd_cmd; // theta += 2 * pi * (spd_cmd / 30.0) * 0.0002;
+    if (theta > 6.2831852)  // 2 * pi = 6.2831852
+      theta -= 6.2831852;
+
+    angle = fmod(theta, 1.047197551);  // 1/3.0 * pi = 1.047197551
+    sector = (int)floor(theta * 0.9549296586) + 1;  // 1 / (1/3.0 * pi) = 0.9549296586
+
+    /* 占空比计算 */
+    Dm = u_cmd / Ud * sin(1.047197551 - angle);  // 1/3.0 * pi = 1.047197551
+    Dn = u_cmd / Ud * sin(angle);
+    D0 = (1 - Dm - Dn) * 0.5;
+    Dm = roundn(Dm, digit);
+    Dn = roundn(Dn, digit);
+    D0 = roundn(D0, digit);
+    if (D0 < 0) D0 = 0;
   
-  switch (sector)
-  {
-  case 1:
-    Tinv[0] = (int)floor(period * (D0));
-    Tinv[1] = (int)floor(period * (D0 + Dm));
-    Tinv[2] = (int)floor(period * (D0 + Dm + Dn));
-    break;
-  case 2:
-    Tinv[0] = (int)floor(period * (D0 + Dn));
-    Tinv[1] = (int)floor(period * (D0));
-    Tinv[2] = (int)floor(period * (D0 + Dm + Dn));
-    break;
-  case 3:
-    Tinv[0] = (int)floor(period * (D0 + Dm + Dn));
-    Tinv[1] = (int)floor(period * (D0));
-    Tinv[2] = (int)floor(period * (D0 + Dm));
-    break;
-  case 4:
-    Tinv[0] = (int)floor(period * (D0 + Dm + Dn));
-    Tinv[1] = (int)floor(period * (D0 + Dn));
-    Tinv[2] = (int)floor(period * (D0));
-    break;
-  case 5:
-    Tinv[0] = (int)floor(period * (D0 + Dm));
-    Tinv[1] = (int)floor(period * (D0 + Dm + Dn));
-    Tinv[2] = (int)floor(period * (D0));
-    break;  
-  case 6:
-    Tinv[0] = (int)floor(period * (D0));
-    Tinv[1] = (int)floor(period * (D0 + Dm + Dn));
-    Tinv[2] = (int)floor(period * (D0 + Dn));
-  }   
+    /* 三相PWM比较值计算 */
+    switch (sector)
+    {
+    case 1:
+      Tinv[0] = (int)(period * (Dm + Dn + D0));
+      Tinv[1] = (int)(period * (D0 + Dn));
+      Tinv[2] = (int)(period * (D0));
+      break;
+    case 2:
+      Tinv[0] = (int)(period * (Dm + D0));
+      Tinv[1] = (int)(period * (Dm + Dn + D0));
+      Tinv[2] = (int)(period * (D0));
+      break;
+    case 3:
+      Tinv[0] = (int)(period * (D0));
+      Tinv[1] = (int)(period * (Dm + Dn + D0));
+      Tinv[2] = (int)(period * (Dn + D0));
+      break;
+    case 4:
+      Tinv[0] = (int)(period * (D0));
+      Tinv[1] = (int)(period * (Dm + D0));
+      Tinv[2] = (int)(period * (Dm + Dn + D0));
+      break;
+    case 5:
+      Tinv[0] = (int)(period * (Dn + D0));
+      Tinv[1] = (int)(period * (D0));
+      Tinv[2] = (int)(period * (Dm + Dn + D0));
+      break;
+    case 6:
+      Tinv[0] = (int)(period * (Dm + Dn + D0));
+      Tinv[1] = (int)(period * (D0));
+      Tinv[2] = (int)(period * (Dm + D0));
+    }
 }
 
 void ualbeSVM(double Ual, double Ube, double Ud, Uint16 invprd1, Uint16 invprd2, Uint16 *Tinv1, Uint16 *Tinv2)
 {
-  double dm, dn, d0;
-  int sector;
-  double k = Ube / Ual;
-  
-  if (Ual > 0 && Ube >= 0 && k >= 0 && k < sqrt(3))
-  {
-    sector = 1;
-    dm = (Ual - Ube/sqrt(3)) / Ud;
-    dn = 2/sqrt(3) * Ube / Ud;
-  }
-  else if (Ube > 0 && (k >= sqrt(3) || k < -sqrt(3)))
-  {
-    sector = 2;
-    dm = (Ual + Ube/sqrt(3)) / Ud;
-    dn = (-Ual + Ube/sqrt(3)) / Ud;
-  }
-  else if (Ual < 0 && Ube > 0 && k >= -sqrt(3) && k < 0)
-  {
-    sector = 3;
-    dm = 2/sqrt(3) * Ube / Ud;
-    dn = (-Ual - Ube/sqrt(3)) / Ud;
-  }
-  else if (Ual < 0 && Ube <= 0 && k >= 0 && k < sqrt(3))
-  { 
-    sector = 4;
-    dm = (-Ual + Ube/sqrt(3)) / Ud;
-    dn = -2/sqrt(3) * Ube / Ud;
-  }
-  else if (Ube < 0 && (k >= sqrt(3) || k < -sqrt(3)))
-  {
-    sector = 5;
-    dm = (-Ual - Ube/sqrt(3)) / Ud;
-    dn = (Ual - Ube/sqrt(3)) / Ud;
-  }
-  else if (Ual > 0 && Ube < 0 && k >= -sqrt(3) && k < 0)
-  {
-    sector = 6;
-    dm = -2/sqrt(3) * Ube / Ud;
-    dn = (Ual + Ube/sqrt(3)) / Ud;
-  }
-  else
-  {
-    sector = 1;
-    dm = 0;
-    dn = 0;
-  }
-  
-/*  if (dm + dn >= 1)
-  {
-    double temp = dm / (dm + dn);
-    dn = dn / (dm + dn);
-    dm = temp;
-    d0 = 0;
-  }
-  else
-    d0 = 0.5 * (1 - dm - dn);*/
+	double dm, dn, d0;
+	double k = Ube / Ual;
+	double reciUd = 1.0 / Ud;
 
-/*  dm = 0.4; // test
-  dn = 0.4;
-  sector = 1;*/
+	/* 扇区判断及占空比计算 */
+	// sqrt(3) = 1.7320508, sqrt(3) / 2.0 = 0.8660254044
+	// 1 / sqrt(3) = 0.57735027
+	if (Ual > 0 && Ube >= 0 && k >= 0 && k < 1.7320508)
+	{
+	sector = 1;
+	dm = 0.8660254044 * (Ual - Ube * 0.57735027) * reciUd;
+	dn = Ube * reciUd;
+	}
+	else if (Ube > 0 && (k >= 1.7320508 || k < -1.7320508))
+	{
+	sector = 2;
+	dm = 0.8660254044 * (Ual + Ube * 0.57735027) * reciUd;
+	dn = 0.8660254044 * (-Ual + Ube * 0.57735027) * reciUd;
+	}
+	else if (Ual < 0 && Ube > 0 && k >= -1.7320508 && k < 0)
+	{
+	sector = 3;
+	dm = Ube * reciUd;
+	dn = 0.8660254044 * (-Ual - Ube * 0.57735027) * reciUd;
+	}
+	else if (Ual < 0 && Ube <= 0 && k >= 0 && k < 1.7320508)
+	{
+	sector = 4;
+	dm = 0.8660254044 * (-Ual + Ube * 0.57735027) * reciUd;
+	dn = -Ube * reciUd;
+	}
+	else if (Ube < 0 && (k >= 1.7320508 || k < -1.7320508))
+	{
+	sector = 5;
+	dm = 0.8660254044 * (-Ual - Ube * 0.57735027) * reciUd;
+	dn = 0.8660254044 * (Ual - Ube * 0.57735027) * reciUd;
+	}
+	else if (Ual > 0 && Ube < 0 && k >= -1.7320508 && k < 0)
+	{
+	sector = 6;
+	dm = -Ube * reciUd;
+	dn = 0.8660254044 * (Ual + Ube * 0.57735027) * reciUd;
+	}
+	else
+	{
+	sector = 1;
+	dm = 0;
+	dn = 0;
+	}
 
-  d0 = (1 - dm - dn) * 0.5;
-  
-  switch (sector)
-  {
-  case 1:
-    {      
-      if (d0 < 0 || (invprd1 * d0 < zerolimit))
-      {
-    	  double dmt = dm / (dm + dn);
-    	  Tinv1[0] = zerolimit;
-    	  Tinv1[1] = zerolimit + (int)((invprd1 - 2*zerolimit) * dmt);
-    	  Tinv1[2] = invprd1 - zerolimit;
-      }
-      else
-      {
-          Tinv1[0] = (int)(invprd1 * (d0));
-          Tinv1[1] = (int)(invprd1 * (dm + d0));
-          Tinv1[2] = (int)(invprd1 * (dm + dn + d0));
-      }
+	if (dm + dn >= 1)
+	{
+	double temp = dm / (dm + dn);
+	dn = dn / (dm + dn);
+	dm = temp;
+	d0 = 0;
+	}
+	else
+	d0 = 0.5 * (1 - dm - dn);
 
-      if (d0 < 0 || (invprd2 * d0 < zerolimit))
-      {
-    	  double dnt = dn / (dm + dn);
-    	  Tinv2[0] = invprd2 - zerolimit;
-    	  Tinv2[1] = zerolimit + (int)((invprd2 - 2*zerolimit) * dnt);
-    	  Tinv2[0] = zerolimit;
-      }
-      else
-      {
-          Tinv2[0] = (int)(invprd2 * (dm + dn + d0));
-          Tinv2[1] = (int)(invprd2 * (dn + d0));
-          Tinv2[2] = (int)(invprd2 * (d0));
-      }
-
-      break;
-    }
-  case 2:
-    {
-      if (d0 < 0 || (invprd1 * d0 < zerolimit))
-      {
-    	  double dnt = dn / (dm + dn);
-    	  Tinv1[0] = zerolimit + (int)((invprd1 - 2*zerolimit) * dnt);
-      	  Tinv1[1] = zerolimit;
-      	  Tinv1[2] = invprd1 - zerolimit;
-      }
-      else
-      {
-          Tinv1[0] = (int)(invprd1 * (dn + d0));
-          Tinv1[1] = (int)(invprd1 * (d0));
-          Tinv1[2] = (int)(invprd1 * (dm + dn + d0));
-      }
-
-      if (d0 < 0 || (invprd2 * d0 < zerolimit))
-      {
-    	  double dmt = dm / (dm + dn);
-    	  Tinv2[0] = zerolimit + (int)((invprd2 - 2*zerolimit) * dmt);
-    	  Tinv2[1] = invprd2 - zerolimit;
-    	  Tinv2[2] = zerolimit;
-      }
-      else
-      {
-          Tinv2[0] = (int)(invprd2 * (dm + d0));
-          Tinv2[1] = (int)(invprd2 * (dm + dn + d0));
-          Tinv2[2] = (int)(invprd2 * (d0));
-      }
-
-      break;
-    }
-  case 3:
-    {
-      if (d0 < 0 || (invprd1 * d0 < zerolimit))
-      {
-    	  double dmt = dm / (dm + dn);
-      	  Tinv1[0] = invprd1 - zerolimit;
-      	  Tinv1[1] = zerolimit;
-      	  Tinv1[2] = zerolimit + (int)((invprd1 - 2*zerolimit) * dmt);
-      }
-      else
-      {
-          Tinv1[0] = (int)(invprd1 * (dm + dn + d0));
-          Tinv1[1] = (int)(invprd1 * (d0));
-          Tinv1[2] = (int)(invprd1 * (dm + d0));
-      }
-
-      if (d0 < 0 || (invprd2 * d0 < zerolimit))
-      {
-      	  double dnt = dn / (dm + dn);
-      	  Tinv2[0] = zerolimit;
-      	  Tinv2[1] = invprd2 - zerolimit;
-      	  Tinv2[2] = zerolimit + (int)((invprd2 - 2*zerolimit) * dnt);
-      }
-      else
-      {
-          Tinv2[0] = (int)(invprd2 * (d0));
-          Tinv2[1] = (int)(invprd2 * (dm + dn + d0));
-          Tinv2[2] = (int)(invprd2 * (dn + d0));
-      }
-
-      break;
-    }
-  case 4:
-    {
-      if (d0 < 0 || (invprd1 * d0 < zerolimit))
-      {
-      	  double dnt = dn / (dm + dn);
-      	  Tinv1[0] = invprd1 - zerolimit;
-      	  Tinv1[1] = zerolimit + (int)((invprd1 - 2*zerolimit) * dnt);
-      	  Tinv1[2] = zerolimit;
-      }
-      else
-      {
-          Tinv1[0] = (int)(invprd1 * (dm + dn + d0));
-          Tinv1[1] = (int)(invprd1 * (dn + d0));
-          Tinv1[2] = (int)(invprd1 * (d0));
-      }
-
-      if (d0 < 0 || (invprd2 * d0 < zerolimit))
-      {
-    	  double dmt = dm / (dm + dn);
-      	  Tinv2[0] = zerolimit;
-      	  Tinv2[1] = zerolimit + (int)((invprd2 - 2*zerolimit) * dmt);
-      	  Tinv2[2] = invprd2 - zerolimit;
-      }
-      else
-      {
-          Tinv2[0] = (int)(invprd2 * (d0));
-          Tinv2[1] = (int)(invprd2 * (dm + d0));
-          Tinv2[2] = (int)(invprd2 * (dm + dn + d0));
-      }
-
-      break;
-    }
-  case 5:
-    {
-      if (d0 < 0 || (invprd1 * d0 < zerolimit))
-      {
-    	  double dmt = dm / (dm + dn);
-    	  Tinv1[0] = zerolimit + (int)((invprd1 - 2*zerolimit) * dmt);
-    	  Tinv1[1] = invprd1 - zerolimit;
-    	  Tinv1[2] = zerolimit;
-      }
-      else
-      {
-          Tinv1[0] = (int)(invprd1 * (dm + d0));
-          Tinv1[1] = (int)(invprd1 * (dm + dn + d0));
-          Tinv1[2] = (int)(invprd1 * (d0));
-      }
-
-      if (d0 < 0 || (invprd2 * d0 < zerolimit))
-      {
-    	  double dnt = dn / (dm + dn);
-    	  Tinv2[0] = zerolimit + (int)((invprd2 - 2*zerolimit) * dnt);
-    	  Tinv2[1] = zerolimit;
-    	  Tinv2[2] = invprd2 - zerolimit;
-      }
-      else
-      {
-          Tinv2[0] = (int)(invprd2 * (dn + d0));
-          Tinv2[1] = (int)(invprd2 * (d0));
-          Tinv2[2] = (int)(invprd2 * (dm + dn + d0));
-      }
-
-      break;
-    }
-  case 6:
-    {
-      if (d0 < 0 || (invprd1 * d0 < zerolimit))
-      {
-    	  double dnt = dn / (dm + dn);
-    	  Tinv1[0] = zerolimit;
-    	  Tinv1[1] = invprd1 - zerolimit;
-    	  Tinv1[2] = zerolimit + (int)((invprd1 - 2*zerolimit) * dnt);
-      }
-      else
-      {
-          Tinv1[0] = (int)(invprd1 * (d0));
-          Tinv1[1] = (int)(invprd1 * (dm + dn + d0));
-          Tinv1[2] = (int)(invprd1 * (dn + d0));
-      }
-
-      if (d0 < 0 || (invprd2 * d0 < zerolimit))
-      {
-    	  double dmt = dm / (dm + dn);
-    	  Tinv2[0] = invprd2 - zerolimit;
-    	  Tinv2[1] = zerolimit;
-    	  Tinv2[2] = zerolimit + (int)((invprd2 - 2*zerolimit) * dmt);
-      }
-      else
-      {
-          Tinv2[0] = (int)(invprd2 * (dm + dn + d0));
-          Tinv2[1] = (int)(invprd2 * (d0));
-          Tinv2[2] = (int)(invprd2 * (dm + d0));
-      }
-
-      break;
-    }
-  default:
-    {
-      Tinv1[0] = invprd1 + 1;
-      Tinv1[1] = invprd1 + 1;
-      Tinv1[2] = invprd1 + 1;
-      Tinv2[0] = invprd2 + 1;
-      Tinv2[1] = invprd2 + 1;
-      Tinv2[2] = invprd2 + 1;
-    }
-  }
+	/* 三相PWM比较值计算 */
+	switch (sector)
+	{
+	case 1:
+	{
+	  Tinv[0] = (int)(period * (dm + dn + d0));
+	  Tinv[1] = (int)(period * (dn + d0));
+	  Tinv[2] = (int)(period * d0);
+	  break;
+	}
+	case 2:
+	{
+	  Tinv[0] = (int)(period * (dm + d0));
+	  Tinv[1] = (int)(period * (dm + dn + d0));
+	  Tinv[2] = (int)(period * d0);
+	  break;
+	}
+	case 3:
+	{
+	  Tinv[0] = (int)(period * (d0));
+	  Tinv[1] = (int)(period * (dm + dn + d0));
+	  Tinv[2] = (int)(period * (dn + d0));
+	  break;
+	}
+	case 4:
+	{
+	  Tinv[0] = (int)(period * (d0));
+	  Tinv[1] = (int)(period * (dm + d0));
+	  Tinv[2] = (int)(period * (dm + dn + d0));
+	  break;
+	}
+	case 5:
+	{
+	  Tinv[0] = (int)(period * (dn + d0));
+	  Tinv[1] = (int)(period * (d0));
+	  Tinv[2] = (int)(period * (dm + dn + d0));
+	  break;
+	}
+	case 6:
+	{
+	  Tinv[0] = (int)(period * (dm + dn + d0));
+	  Tinv[1] = (int)(period * (d0));
+	  Tinv[2] = (int)(period * (dm + d0));
+	  break;
+	}
+	default:
+	{
+	  Tinv[0] = period + 1;
+	  Tinv[1] = period + 1;
+	  Tinv[2] = period + 1;
+	}
+	}
 }
 
 void udqSVM()

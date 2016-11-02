@@ -8,18 +8,18 @@ void InitPORT()
 	EALLOW;
 
 	//epwm1-12
-	GpioCtrlRegs.GPAPUD.bit.GPIO0 = 1;   // disable pullup on GPIO0
-	GpioCtrlRegs.GPAPUD.bit.GPIO1 = 1;   // disable pullup on GPIO1
-	GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;   // disable pullup on GPIO2
-	GpioCtrlRegs.GPAPUD.bit.GPIO3 = 1;   // disable pullup on GPIO3
-	GpioCtrlRegs.GPAPUD.bit.GPIO4 = 1;   // disable pullup on GPIO4
-	GpioCtrlRegs.GPAPUD.bit.GPIO5 = 1;   // disable pullup on GPIO5
-	GpioCtrlRegs.GPAPUD.bit.GPIO6 = 1;   // disable pullup on GPIO0
-	GpioCtrlRegs.GPAPUD.bit.GPIO7 = 1;   // disable pullup on GPIO1
-	GpioCtrlRegs.GPAPUD.bit.GPIO8 = 1;   // disable pullup on GPIO2
-	GpioCtrlRegs.GPAPUD.bit.GPIO9 = 1;   // disable pullup on GPIO3
-	GpioCtrlRegs.GPAPUD.bit.GPIO10 = 1;   // disable pullup on GPIO4
-	GpioCtrlRegs.GPAPUD.bit.GPIO11 = 1;   // disable pullup on GPIO5
+	GpioCtrlRegs.GPAPUD.bit.GPIO0 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO1 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO2 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO3 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO4 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO5 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO6 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO7 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO8 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO9 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO10 = 0;
+	GpioCtrlRegs.GPAPUD.bit.GPIO11 = 0;
 
 	GpioCtrlRegs.GPAMUX1.bit.GPIO0 = 1; // GPIO 初始化为epwm输出
 	GpioCtrlRegs.GPAMUX1.bit.GPIO1 = 1;
@@ -113,6 +113,34 @@ void InitPORT()
 	GpioCtrlRegs.GPBMUX1.bit.GPIO38 = 3;  // XWE0
 	GpioCtrlRegs.GPBMUX1.bit.GPIO37 = 3;  // XZCS7
 	GpioCtrlRegs.GPAMUX2.bit.GPIO28 = 3;  // XZCS6
+
+	// SCIB
+	GpioCtrlRegs.GPAPUD.bit.GPIO18 = 0;	   // Enable pull-up for GPIO18 (SCITXDB)
+	GpioCtrlRegs.GPAPUD.bit.GPIO19 = 0;	   // Enable pull-up for GPIO19 (SCIRXDB)
+	GpioCtrlRegs.GPAQSEL2.bit.GPIO19 = 3;  // Asynch input GPIO19 (SCIRXDB)
+	GpioCtrlRegs.GPAMUX2.bit.GPIO18 = 2;   // Configure GPIO18 for SCITXDB operation
+	GpioCtrlRegs.GPAMUX2.bit.GPIO19 = 2;   // Configure GPIO19 for SCIRXDB operation
+
+	// SPIA
+    GpioCtrlRegs.GPBPUD.bit.GPIO54 = 0;   // Enable pull-up on GPIO16 (SPISIMOA)
+    GpioCtrlRegs.GPBPUD.bit.GPIO55 = 0;   // Enable pull-up on GPIO17 (SPISOMIA)
+    GpioCtrlRegs.GPBPUD.bit.GPIO56 = 0;   // Enable pull-up on GPIO18 (SPICLKA)
+    GpioCtrlRegs.GPBPUD.bit.GPIO57 = 0;   // Enable pull-up on GPIO19 (SPISTEA)
+
+    GpioCtrlRegs.GPBQSEL2.bit.GPIO54 = 3; // Asynch input GPIO16 (SPISIMOA)
+    GpioCtrlRegs.GPBQSEL2.bit.GPIO55 = 3; // Asynch input GPIO17 (SPISOMIA)
+    GpioCtrlRegs.GPBQSEL2.bit.GPIO56 = 3; // Asynch input GPIO18 (SPICLKA)
+    GpioCtrlRegs.GPBQSEL2.bit.GPIO57 = 3; // Asynch input GPIO19 (SPISTEA)
+
+    //GpioCtrlRegs.GPBDIR.bit.GPIO54 = 1;
+    //GpioCtrlRegs.GPBDIR.bit.GPIO55 = 0;
+    //GpioCtrlRegs.GPBDIR.bit.GPIO56 = 1;
+    //GpioCtrlRegs.GPBDIR.bit.GPIO57 = 1;
+
+    GpioCtrlRegs.GPBMUX2.bit.GPIO54 = 1; // Configure GPIO16 as SPISIMOA
+    GpioCtrlRegs.GPBMUX2.bit.GPIO55 = 1; // Configure GPIO17 as SPISOMIA
+    GpioCtrlRegs.GPBMUX2.bit.GPIO56 = 1; // Configure GPIO18 as SPICLKA
+    GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 1; // Configure GPIO19 as SPISTEA
 
 	EDIS;
 }

@@ -133,12 +133,3 @@ extern double Integrator(double paramin, double sum, double ts);
 extern void positionSVM();
 extern void ualbeSVM(double Ual, double Ube, double Ud, Uint16 invprd1, Uint16 invprd2, Uint16 *Tinv1, Uint16 *Tinv2);
 extern void udqSVM();
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-  
-
-#ifdef __cplusplus
-}
-#endif
