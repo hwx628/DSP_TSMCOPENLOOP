@@ -8,10 +8,10 @@
 | defines
 |--------------------------------------------------------------------------------------------*/
 //#define period				7500  // 10KHz对应时钟数，TBCLK = SYSCLKOUT
-#define period				15000  // 5KHz对应时钟数，TBCLK = SYSCLKOUT(for test)
+#define period				15000  // 10KHz对应时钟数，TBCLK = SYSCLKOUT(for test)
 #define prediv				0  // 预分频
-#define limitclk				1500  // 整流每个阶段最小值
-#define zerolimit				600
+#define limitclk				1500  // 10us——整流两段最小时间
+#define zerolimit				600  //
 #define DT				150   // 死区
 
 /******************************************************************************

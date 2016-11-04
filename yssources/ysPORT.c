@@ -132,11 +132,6 @@ void InitPORT()
     GpioCtrlRegs.GPBQSEL2.bit.GPIO56 = 3; // Asynch input GPIO18 (SPICLKA)
     GpioCtrlRegs.GPBQSEL2.bit.GPIO57 = 3; // Asynch input GPIO19 (SPISTEA)
 
-    //GpioCtrlRegs.GPBDIR.bit.GPIO54 = 1;
-    //GpioCtrlRegs.GPBDIR.bit.GPIO55 = 0;
-    //GpioCtrlRegs.GPBDIR.bit.GPIO56 = 1;
-    //GpioCtrlRegs.GPBDIR.bit.GPIO57 = 1;
-
     GpioCtrlRegs.GPBMUX2.bit.GPIO54 = 1; // Configure GPIO16 as SPISIMOA
     GpioCtrlRegs.GPBMUX2.bit.GPIO55 = 1; // Configure GPIO17 as SPISOMIA
     GpioCtrlRegs.GPBMUX2.bit.GPIO56 = 1; // Configure GPIO18 as SPICLKA

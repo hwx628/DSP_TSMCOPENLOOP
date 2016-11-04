@@ -9,46 +9,60 @@
 /******************************************************************************
 | defines
 |----------------------------------------------------------------------------*/
-// IM parameters
+/* IM parameters */
 #define Rs 0.4
 #define Ls 0.289368
 #define Rr 3.3278
 #define Lr 0.289368
 #define Lm 0.27325
 #define Tr 0.0869557
+#define np 2
 
-// period
+/* control period */
 #define Ts 1e-4
 
-// command values
-#define nset 400
-#define idset 1.5
+/* lamdar最小值限制 */
+#define lamdarlimit_L 0.01
 
-// PI parameters
+/* PI parameters */
+  // id闭环
 #define ud_Kp 6
 #define ud_Ki 0
-#define ud_Uplimit 60
-#define ud_Downlimit -60
+#define udlimit_H 60
+#define udlimit_L -60
 
-#define iqset_Kp1 2
-#define iqset_Ki1 0
-#define iqset_Kp2 1
-#define iqset_Ki2 20
-#define iqset_Uplimit 0
-#define iqset_Downlimit 0
+  // 速度闭环
+#define spdthd 400  // speed threshold
+#define iq_Kp1 2
+#define iq_Ki1 0
+#define iq_Kp2 1
+#define iq_Ki2 20
+#define iqlimit_H 0
+#define iqlimit_L 0
 
+  // iq闭环
 #define uq_Kp 3
 #define uq_Ki 10
-#define uq_Uplimit 60
-#define uq_Downlimit -60
+#define uqlimit_H 60
+#define uqlimit_L -60
 
-// auxiliary
+/* speed ramp */
+#define spdramp 60  // 斜率
+#define spdlimit_H 450  // 转速上限
+#define spdlimit_L 0  // 转速下限
+
+/* V/spd curve */
+#define VSpdramp 0.024  // 斜率
+#define Voltlimit_H 40  // 电压上限
+#define Voltlimit_L 5  // 电压下限
+
+/* auxiliary */
 #define pi 3.1415926
-#define M 0.95  // modulation factor
 #define Z 1024  // 光电码盘线数
+#define digit 1e6  // roundn参数
 
 /******************************************************************************
-| variables
+| types
 |----------------------------------------------------------------------------*/
 typedef struct
 {
@@ -65,64 +79,65 @@ typedef struct
   double d,q;
 } PHASE_DQ;
 
+/******************************************************************************
+| global variables
+|----------------------------------------------------------------------------*/
+/* 观测值 */
+  // 电压
+extern double Ud;
 extern PHASE_ABC uabc;
 extern PHASE_ALBE ualbe;
+extern PHASE_DQ udq;
+  // 电流
 extern PHASE_ABC iabc;
 extern PHASE_ALBE ialbe;
 extern PHASE_DQ idq;
+  // 磁链
+extern double lamdar;
+extern PHASE_ALBE lamdaralbe;
+extern double theta;
+  // 转速
+extern double speed;
+
+/* 给定值 */
+  // 电压
+extern double u_cmd;
 extern PHASE_ALBE ualbe_cmd;
 extern PHASE_DQ udq_cmd;
-extern double Ud;
+  // 电流
+extern PHASE_DQ idq_cmd;
+  // 转速
+extern double spd_cmd;  // 转速给定
+extern double spd_req;  // 转速设定
 
-extern double theta;
-extern double lamdar;
-extern double n;
-extern double wr;
-extern double iqset;
-
-extern double ud_Isum;
-extern double uq_Isum;
-extern double iqset_Isum;
-extern int period_count;
-
-extern PHASE_ALBE lamdaralbe;
-extern double anglek;
-extern double ualsum;
-extern double ubesum;
-extern double ialsum;
-extern double ibesum;
-
-extern unsigned int cntFTM1;
+/* PI 变量 */
+extern double idlasterr;
+extern double iqlasterr;
+extern double spdlasterr;
 
 /******************************************************************************
 | local functions prototypes
 |----------------------------------------------------------------------------*/
-double roundn(double input, int digit);
+double roundn(double input, int _digit);
 
 /******************************************************************************
 | exported functions
 |----------------------------------------------------------------------------*/
 /* Forward conversion */  
-extern void S3toR2(PHASE_ABC *abc, PHASE_DQ *dq, double theta);
-extern void S3toS2(PHASE_ABC *abc, PHASE_ALBE *albe);
-extern void S2toR2(PHASE_ALBE *albe, PHASE_DQ *dq, double theta);
+extern void S3toR2(PHASE_ABC abc, PHASE_DQ *dq, double theta);
+extern void S3toS2(PHASE_ABC abc, PHASE_ALBE *albe);
+extern void S2toR2(PHASE_ALBE albe, PHASE_DQ *dq, double cosIn, double sinIn);
 
 /* Backward conversion */  
-extern void R2toS3(PHASE_DQ *dq, PHASE_ABC *abc, double theta);
-extern void S2toS3(PHASE_ALBE *albe, PHASE_ABC *abc);
-extern void R2toS2(PHASE_DQ *dq, PHASE_ALBE *albe, double theta);
+extern void R2toS3(PHASE_DQ dq, PHASE_ABC *abc, double theta);
+extern void S2toS3(PHASE_ALBE albe, PHASE_ABC *abc);
+extern void R2toS2(PHASE_DQ dq, PHASE_ALBE *albe, double cosIn, double sinIn);
 
 /* calculate lamdar */  
 extern double lamdarCal(double lamdar, double ism);
-extern void lamdardqCal();
-extern void lamdaralbeCal(PHASE_ALBE ualbe, PHASE_ALBE ialbe, double *ualsum, \
-        double *ubesum, double *ialsum, double *ibesum, PHASE_ALBE *lamdaralbe);
 
 /* calculate position and speed */  
 extern double wrCal_M();
-extern double wrCal_T();
-extern double wrCal_MT();
-extern double wrCal_lamdar(PHASE_ALBE *lamdaralbe, double *anglek, PHASE_ALBE ualbe, PHASE_ALBE ialbe, double ts);
 extern double positonCal(double wr, double lamdar, double ist, double theta);
 
 /* PI module */  
@@ -132,4 +147,7 @@ extern double Integrator(double paramin, double sum, double ts);
 /* SVM */  
 extern void positionSVM();
 extern void ualbeSVM(double Ual, double Ube, double Ud, Uint16 invprd1, Uint16 invprd2, Uint16 *Tinv1, Uint16 *Tinv2);
-extern void udqSVM();
+
+/* Auxiliary Function */
+extern double RAMP(double ramp, double initial, double increment, double Hlimit, double Llimit);
+extern double roundn(double input, int _digit);

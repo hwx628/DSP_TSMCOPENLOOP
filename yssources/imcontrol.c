@@ -15,7 +15,7 @@ Uint16 sector = 0;  // SVM扇区
 |----------------------------------------------------------------------------*/
 /* 观测值 */
   // 电压
-double Ud = 40;
+double Ud;
 PHASE_ABC uabc = {0, 0, 0};
 PHASE_ALBE ualbe = {0, 0};
 PHASE_DQ udq = {0, 0};
@@ -46,51 +46,103 @@ double idlasterr = 0;
 double iqlasterr = 0;
 double spdlasterr = 0;
 
+/*==============================================================================
+=========================== Coordinate Transform ===============================
+==============================================================================*/
+
 /******************************************************************************
-@brief   Coordinate Transform
+@brief   3s/2r 坐标变换
+
+@param   abc -- 三相向量
+         dq -- 两相旋转向量（*指针传递*）
+         theta -- 合成向量角度
+
+@return  N/A
 ******************************************************************************/
-void S3toR2(PHASE_ABC *abc, PHASE_DQ *dq, double theta)
+void S3toR2(PHASE_ABC abc, PHASE_DQ *dq, double theta)
 {
-  //dq->d = sqrt(2.0/3.0) * (cos(theta) * abc->a + cos(theta - 2.0/3.0*pi) * abc->b + cos(theta + 2.0/3.0*pi) * abc->c);
-  //dq->q = -sqrt(2.0/3.0) * (sin(theta) * abc->a + sin(theta - 2.0/3.0*pi) * abc->b + sin(theta + 2.0/3.0*pi) * abc->c);
-  dq->d = sqrt(2.0) * (cos(theta - 1.0/6.0*pi) * abc->a + sin(theta) * abc->b);
-  dq->q = -sqrt(2.0) * (sin(theta - 1.0/6.0*pi) * abc->a - cos(theta) * abc->b);
+  // sqrt(2) = 1.414213562, 1.0/6.0*pi = 0.52359878
+  dq->d = 1.414213562 * (cos(theta - 0.52359878) * abc.a + sin(theta) * abc.b);
+  dq->q = -1.414213562 * (sin(theta - 0.52359878) * abc.a - cos(theta) * abc.b);
 }
 
-void S3toS2(PHASE_ABC *abc, PHASE_ALBE *albe)
+/******************************************************************************
+@brief   3s/2s 坐标变换
+
+@param   abc -- 三相向量
+         albe -- 两相静止向量（*指针传递*）
+
+@return  N/A
+******************************************************************************/
+void S3toS2(PHASE_ABC abc, PHASE_ALBE *albe)
 {
-  //albe->al = sqrt(2.0/3.0) * (abc->a - 0.5 * abc->b - 0.5 * abc->c);
-  //albe->be = sqrt(2.0/3.0) * (sqrt(3)/2.0 * abc->b - sqrt(3)/2.0 * abc->c);
-  albe->al = sqrt(3.0/2.0) * abc->a;
-  albe->be = 1.0/sqrt(2) * abc->a + sqrt(2) * abc->b;
+  // sqrt(3.0/2.0) = 1.22474487, 1.0/sqrt(2) = 0.7071067812, sqrt(2) = 1.414213562
+  albe->al = 1.22474487 * abc.a;
+  albe->be = 0.7071067812 * abc.a + 1.414213562 * abc.b;
 }
 
-void S2toR2(PHASE_ALBE *albe, PHASE_DQ *dq, double theta)
+/******************************************************************************
+@brief   2s/2r 坐标变换
+
+@param   albe -- 两相静止向量
+         dq -- 两相旋转向量（*指针传递*）
+         theta -- 合成向量角度
+
+@return  N/A
+******************************************************************************/
+void S2toR2(PHASE_ALBE albe, PHASE_DQ *dq, double cosIn, double sinIn)
 {
-  dq->d = cos(theta) * albe->al + sin(theta) * albe->be;
-  dq->q = -sin(theta) * albe->al + cos(theta) * albe->be;
+  dq->d = cosIn * albe.al + sinIn * albe.be;
+  dq->q = -sinIn * albe.al + cosIn * albe.be;
 }
 
-void R2toS3(PHASE_DQ *dq, PHASE_ABC *abc, double theta)
+/******************************************************************************
+@brief   2r/3s 坐标变换
+
+@param   dq -- 两相旋转向量
+         abc -- 三相向量（*指针传递*）
+         theta -- 合成向量角度
+
+@return  N/A
+******************************************************************************/
+void R2toS3(PHASE_DQ dq, PHASE_ABC *abc, double theta)
 {
-  abc->a = sqrt(2.0/3.0) * (cos(theta) * dq->d - sin(theta) *dq->q);
-  abc->b = sqrt(2.0/3.0) * (cos(theta - 2.0/3.0*pi) * dq->d - sin(theta - 2.0/3.0*pi) *dq->q);
-  abc->c = sqrt(2.0/3.0) * (cos(theta + 2.0/3.0*pi) * dq->d - sin(theta + 2.0/3.0*pi) *dq->q);
+  // sqrt(2.0/3.0) = 0.81649658, 2.0/3.0*pi = 2.094395102
+  abc->a = 0.81649658 * (cos(theta) * dq.d - sin(theta) *dq.q);
+  abc->b = 0.81649658 * (cos(theta - 2.094395102) * dq.d - sin(theta - 2.094395102) *dq.q);
+  abc->c = 0.81649658 * (cos(theta + 2.094395102) * dq.d - sin(theta + 2.094395102) *dq.q);
 }
 
-void S2toS3(PHASE_ALBE *albe, PHASE_ABC *abc)
+/******************************************************************************
+@brief   2s/3s 坐标变换
+
+@param   albe -- 两相静止向量
+         abc -- 三相向量（*指针传递*）
+
+@return  N/A
+******************************************************************************/
+void S2toS3(PHASE_ALBE albe, PHASE_ABC *abc)
 {
-  abc->a = sqrt(2.0/3.0) * albe->al;
-  abc->b = sqrt(2.0/3.0) * (-0.5 * albe->al + sqrt(3)/2.0 * albe->be);
-  abc->c = sqrt(2.0/3.0) * (-0.5 * albe->al - sqrt(3)/2.0 * albe->be);
+  // sqrt(2.0/3.0) = 0.81649658, sqrt(3)/2.0 = 0.8660254
+  abc->a = 0.81649658 * albe.al;
+  abc->b = -0.40824829 * albe.al + 0.70710678 * albe.be; // abc->b = sqrt(2.0/3.0) * (-0.5 * albe.al + sqrt(3)/2.0 * albe.be)
+  abc->c = -0.40824829 * albe.al - 0.70710678 * albe.be; // sqrt(2.0/3.0) * (-0.5 * albe.al - sqrt(3)/2.0 * albe.be);
 }
 
-void R2toS2(PHASE_DQ *dq, PHASE_ALBE *albe, double theta)
-{
-  albe->al = cos(theta) * dq->d - sin(theta) * dq->q;
-  albe->be = sin(theta) * dq->d + cos(theta) * dq->q;
-}
+/******************************************************************************
+@brief   2r/2s 坐标变换
 
+@param   dq -- 两相旋转向量
+         albe -- 两相静止向量（*指针传递*）
+         theta -- 合成向量角度
+
+@return  N/A
+******************************************************************************/
+void R2toS2(PHASE_DQ dq, PHASE_ALBE *albe, double cosIn, double sinIn)
+{
+  albe->al = cosIn * dq.d - sinIn * dq.q;
+  albe->be = sinIn * dq.d + cosIn * dq.q;
+}
 /******************************************************************************
 @brief   Rotor Flux Calculation
 ******************************************************************************/
@@ -120,38 +172,6 @@ double wrCal_M()
 {
   //unsigned int temp;
   //return 60.0 * (cntFTM1 - temp) / (Z * 0.001);
-}
-
-double wrCal_lamdar(PHASE_ALBE *lamdaralbe, double *anglek, PHASE_ALBE ualbe, PHASE_ALBE ialbe, double ts) // 未测试
-{
-  double angle = 0;
-  double we =0, wsl = 0;
-  
-  lamdaralbeCal(ualbe, ialbe, &ualsum, &ubesum, &ialsum, &ibesum, lamdaralbe);
-  if (lamdaralbe->al != 0)
-  {    
-    angle = atan(lamdaralbe->be / lamdaralbe->al);
-    if (fabs(angle - *anglek) < 0.5 * pi)
-      we = (angle - *anglek) / ts;
-    else if (angle <= 0)
-      we = (angle - *anglek + pi) / ts;
-    else
-      we = (angle - *anglek - pi);
-    
-    *anglek = angle;
-    
-    wsl = Lm/Tr * (lamdaralbe->be - lamdaralbe->al) / (pow(lamdaralbe->al, 2) + pow(lamdaralbe->be, 2));
-  }
-  else
-  {
-    we = 0;
-    wsl = 0;
-  }
-  
-  if (fabs(we - wsl) < 90)
-    return we - wsl;
-  else
-    return 0;
 }
 
 double positonCal(double wr, double lamdar, double ist, double theta)
@@ -190,194 +210,309 @@ double Integrator(double paramin, double sum, double ts)
 /******************************************************************************
 @brief   SVM 
 ******************************************************************************/ 
-void positionSVM(unsigned int *Tinv)
-{
-    double Dm = 0, Dn = 0, D0 = 0;
-
-    /* V/spd曲线计算电压给定值 */
-    u_cmd = RAMP(VSpdramp, 0, spd_cmd, Voltlimit_H, Voltlimit_L);
-  
-    /* 扇区及夹角计算 */
-    //theta += 2 * pi * (spd_cmd / 30.0) * 0.0001;  ==========================================================
-    theta += 0.0000418879 * spd_cmd; // theta += 2 * pi * (spd_cmd / 30.0) * 0.0002;
-    if (theta > 6.2831852)  // 2 * pi = 6.2831852
-      theta -= 6.2831852;
-
-    angle = fmod(theta, 1.047197551);  // 1/3.0 * pi = 1.047197551
-    sector = (int)floor(theta * 0.9549296586) + 1;  // 1 / (1/3.0 * pi) = 0.9549296586
-
-    /* 占空比计算 */
-    Dm = u_cmd / Ud * sin(1.047197551 - angle);  // 1/3.0 * pi = 1.047197551
-    Dn = u_cmd / Ud * sin(angle);
-    D0 = (1 - Dm - Dn) * 0.5;
-    Dm = roundn(Dm, digit);
-    Dn = roundn(Dn, digit);
-    D0 = roundn(D0, digit);
-    if (D0 < 0) D0 = 0;
-  
-    /* 三相PWM比较值计算 */
-    switch (sector)
-    {
-    case 1:
-      Tinv[0] = (int)(period * (Dm + Dn + D0));
-      Tinv[1] = (int)(period * (D0 + Dn));
-      Tinv[2] = (int)(period * (D0));
-      break;
-    case 2:
-      Tinv[0] = (int)(period * (Dm + D0));
-      Tinv[1] = (int)(period * (Dm + Dn + D0));
-      Tinv[2] = (int)(period * (D0));
-      break;
-    case 3:
-      Tinv[0] = (int)(period * (D0));
-      Tinv[1] = (int)(period * (Dm + Dn + D0));
-      Tinv[2] = (int)(period * (Dn + D0));
-      break;
-    case 4:
-      Tinv[0] = (int)(period * (D0));
-      Tinv[1] = (int)(period * (Dm + D0));
-      Tinv[2] = (int)(period * (Dm + Dn + D0));
-      break;
-    case 5:
-      Tinv[0] = (int)(period * (Dn + D0));
-      Tinv[1] = (int)(period * (D0));
-      Tinv[2] = (int)(period * (Dm + Dn + D0));
-      break;
-    case 6:
-      Tinv[0] = (int)(period * (Dm + Dn + D0));
-      Tinv[1] = (int)(period * (D0));
-      Tinv[2] = (int)(period * (Dm + D0));
-    }
-}
-
 void ualbeSVM(double Ual, double Ube, double Ud, Uint16 invprd1, Uint16 invprd2, Uint16 *Tinv1, Uint16 *Tinv2)
 {
-	double dm, dn, d0;
-	double k = Ube / Ual;
-	double reciUd = 1.0 / Ud;
+  double dm, dn, d0;
+  double k = Ube / Ual;
+  double reciUd = 1.0 / Ud;
+  
+  /* 扇区判断及占空比计算 */
+  // sqrt(3) = 1.7320508, sqrt(3) / 2.0 = 0.8660254044
+  // 1 / sqrt(3) = 0.57735027
+  if (Ual > 0 && Ube >= 0 && k >= 0 && k < 1.7320508)
+  {
+    sector = 1;
+    dm = 0.8660254044 * (Ual - Ube * 0.57735027) * reciUd;
+    dn = Ube * reciUd;
+  }
+  else if (Ube > 0 && (k >= 1.7320508 || k < -1.7320508))
+  {
+    sector = 2;
+    dm = 0.8660254044 * (Ual + Ube * 0.57735027) * reciUd;
+    dn = 0.8660254044 * (-Ual + Ube * 0.57735027) * reciUd;
+  }
+  else if (Ual < 0 && Ube > 0 && k >= -1.7320508 && k < 0)
+  {
+    sector = 3;
+    dm = Ube * reciUd;
+    dn = 0.8660254044 * (-Ual - Ube * 0.57735027) * reciUd;
+  }
+  else if (Ual < 0 && Ube <= 0 && k >= 0 && k < 1.7320508)
+  {
+    sector = 4;
+    dm = 0.8660254044 * (-Ual + Ube * 0.57735027) * reciUd;
+    dn = -Ube * reciUd;
+  }
+  else if (Ube < 0 && (k >= 1.7320508 || k < -1.7320508))
+  {
+    sector = 5;
+    dm = 0.8660254044 * (-Ual - Ube * 0.57735027) * reciUd;
+    dn = 0.8660254044 * (Ual - Ube * 0.57735027) * reciUd;
+  }
+  else if (Ual > 0 && Ube < 0 && k >= -1.7320508 && k < 0)
+  {
+    sector = 6;
+    dm = -Ube * reciUd;
+    dn = 0.8660254044 * (Ual + Ube * 0.57735027) * reciUd;
+  }
+  else
+  {
+    sector = 1;
+    dm = 0;
+    dn = 0;
+  }
 
-	/* 扇区判断及占空比计算 */
-	// sqrt(3) = 1.7320508, sqrt(3) / 2.0 = 0.8660254044
-	// 1 / sqrt(3) = 0.57735027
-	if (Ual > 0 && Ube >= 0 && k >= 0 && k < 1.7320508)
-	{
-	sector = 1;
-	dm = 0.8660254044 * (Ual - Ube * 0.57735027) * reciUd;
-	dn = Ube * reciUd;
-	}
-	else if (Ube > 0 && (k >= 1.7320508 || k < -1.7320508))
-	{
-	sector = 2;
-	dm = 0.8660254044 * (Ual + Ube * 0.57735027) * reciUd;
-	dn = 0.8660254044 * (-Ual + Ube * 0.57735027) * reciUd;
-	}
-	else if (Ual < 0 && Ube > 0 && k >= -1.7320508 && k < 0)
-	{
-	sector = 3;
-	dm = Ube * reciUd;
-	dn = 0.8660254044 * (-Ual - Ube * 0.57735027) * reciUd;
-	}
-	else if (Ual < 0 && Ube <= 0 && k >= 0 && k < 1.7320508)
-	{
-	sector = 4;
-	dm = 0.8660254044 * (-Ual + Ube * 0.57735027) * reciUd;
-	dn = -Ube * reciUd;
-	}
-	else if (Ube < 0 && (k >= 1.7320508 || k < -1.7320508))
-	{
-	sector = 5;
-	dm = 0.8660254044 * (-Ual - Ube * 0.57735027) * reciUd;
-	dn = 0.8660254044 * (Ual - Ube * 0.57735027) * reciUd;
-	}
-	else if (Ual > 0 && Ube < 0 && k >= -1.7320508 && k < 0)
-	{
-	sector = 6;
-	dm = -Ube * reciUd;
-	dn = 0.8660254044 * (Ual + Ube * 0.57735027) * reciUd;
-	}
-	else
-	{
-	sector = 1;
-	dm = 0;
-	dn = 0;
-	}
+  if (dm + dn >= 1)
+  {
+    double temp = dm / (dm + dn);
+    dn = dn / (dm + dn);
+    dm = temp;
+    d0 = 0;
+  }
+  else
+    d0 = 0.5 * (1 - dm - dn);
+  
+  switch (sector)
+  {
+  case 1:
+    {      
+      if (d0 < 0 || (invprd1 * d0 < zerolimit))
+      {
+    	  double dmt = dm / (dm + dn);
+    	  Tinv1[0] = zerolimit;
+    	  Tinv1[1] = zerolimit + (int)((invprd1 - 2*zerolimit) * dmt);
+    	  Tinv1[2] = invprd1 - zerolimit;
+      }
+      else
+      {
+          Tinv1[0] = (int)(invprd1 * (d0));
+          Tinv1[1] = (int)(invprd1 * (dm + d0));
+          Tinv1[2] = (int)(invprd1 * (dm + dn + d0));
+      }
 
-	if (dm + dn >= 1)
-	{
-	double temp = dm / (dm + dn);
-	dn = dn / (dm + dn);
-	dm = temp;
-	d0 = 0;
-	}
-	else
-	d0 = 0.5 * (1 - dm - dn);
+      if (d0 < 0 || (invprd2 * d0 < zerolimit))
+      {
+    	  double dnt = dn / (dm + dn);
+    	  Tinv2[0] = invprd2 - zerolimit;
+    	  Tinv2[1] = zerolimit + (int)((invprd2 - 2*zerolimit) * dnt);
+    	  Tinv2[0] = zerolimit;
+      }
+      else
+      {
+          Tinv2[0] = (int)(invprd2 * (dm + dn + d0));
+          Tinv2[1] = (int)(invprd2 * (dn + d0));
+          Tinv2[2] = (int)(invprd2 * (d0));
+      }
 
-	/* 三相PWM比较值计算 */
-	switch (sector)
-	{
-	case 1:
-	{
-	  Tinv[0] = (int)(period * (dm + dn + d0));
-	  Tinv[1] = (int)(period * (dn + d0));
-	  Tinv[2] = (int)(period * d0);
-	  break;
-	}
-	case 2:
-	{
-	  Tinv[0] = (int)(period * (dm + d0));
-	  Tinv[1] = (int)(period * (dm + dn + d0));
-	  Tinv[2] = (int)(period * d0);
-	  break;
-	}
-	case 3:
-	{
-	  Tinv[0] = (int)(period * (d0));
-	  Tinv[1] = (int)(period * (dm + dn + d0));
-	  Tinv[2] = (int)(period * (dn + d0));
-	  break;
-	}
-	case 4:
-	{
-	  Tinv[0] = (int)(period * (d0));
-	  Tinv[1] = (int)(period * (dm + d0));
-	  Tinv[2] = (int)(period * (dm + dn + d0));
-	  break;
-	}
-	case 5:
-	{
-	  Tinv[0] = (int)(period * (dn + d0));
-	  Tinv[1] = (int)(period * (d0));
-	  Tinv[2] = (int)(period * (dm + dn + d0));
-	  break;
-	}
-	case 6:
-	{
-	  Tinv[0] = (int)(period * (dm + dn + d0));
-	  Tinv[1] = (int)(period * (d0));
-	  Tinv[2] = (int)(period * (dm + d0));
-	  break;
-	}
-	default:
-	{
-	  Tinv[0] = period + 1;
-	  Tinv[1] = period + 1;
-	  Tinv[2] = period + 1;
-	}
-	}
-}
+      break;
+    }
+  case 2:
+    {
+      if (d0 < 0 || (invprd1 * d0 < zerolimit))
+      {
+    	  double dnt = dn / (dm + dn);
+    	  Tinv1[0] = zerolimit + (int)((invprd1 - 2*zerolimit) * dnt);
+      	  Tinv1[1] = zerolimit;
+      	  Tinv1[2] = invprd1 - zerolimit;
+      }
+      else
+      {
+          Tinv1[0] = (int)(invprd1 * (dn + d0));
+          Tinv1[1] = (int)(invprd1 * (d0));
+          Tinv1[2] = (int)(invprd1 * (dm + dn + d0));
+      }
 
-void udqSVM()
-{
+      if (d0 < 0 || (invprd2 * d0 < zerolimit))
+      {
+    	  double dmt = dm / (dm + dn);
+    	  Tinv2[0] = zerolimit + (int)((invprd2 - 2*zerolimit) * dmt);
+    	  Tinv2[1] = invprd2 - zerolimit;
+    	  Tinv2[2] = zerolimit;
+      }
+      else
+      {
+          Tinv2[0] = (int)(invprd2 * (dm + d0));
+          Tinv2[1] = (int)(invprd2 * (dm + dn + d0));
+          Tinv2[2] = (int)(invprd2 * (d0));
+      }
+
+      break;
+    }
+  case 3:
+    {
+      if (d0 < 0 || (invprd1 * d0 < zerolimit))
+      {
+    	  double dmt = dm / (dm + dn);
+      	  Tinv1[0] = invprd1 - zerolimit;
+      	  Tinv1[1] = zerolimit;
+      	  Tinv1[2] = zerolimit + (int)((invprd1 - 2*zerolimit) * dmt);
+      }
+      else
+      {
+          Tinv1[0] = (int)(invprd1 * (dm + dn + d0));
+          Tinv1[1] = (int)(invprd1 * (d0));
+          Tinv1[2] = (int)(invprd1 * (dm + d0));
+      }
+
+      if (d0 < 0 || (invprd2 * d0 < zerolimit))
+      {
+      	  double dnt = dn / (dm + dn);
+      	  Tinv2[0] = zerolimit;
+      	  Tinv2[1] = invprd2 - zerolimit;
+      	  Tinv2[2] = zerolimit + (int)((invprd2 - 2*zerolimit) * dnt);
+      }
+      else
+      {
+          Tinv2[0] = (int)(invprd2 * (d0));
+          Tinv2[1] = (int)(invprd2 * (dm + dn + d0));
+          Tinv2[2] = (int)(invprd2 * (dn + d0));
+      }
+
+      break;
+    }
+  case 4:
+    {
+      if (d0 < 0 || (invprd1 * d0 < zerolimit))
+      {
+      	  double dnt = dn / (dm + dn);
+      	  Tinv1[0] = invprd1 - zerolimit;
+      	  Tinv1[1] = zerolimit + (int)((invprd1 - 2*zerolimit) * dnt);
+      	  Tinv1[2] = zerolimit;
+      }
+      else
+      {
+          Tinv1[0] = (int)(invprd1 * (dm + dn + d0));
+          Tinv1[1] = (int)(invprd1 * (dn + d0));
+          Tinv1[2] = (int)(invprd1 * (d0));
+      }
+
+      if (d0 < 0 || (invprd2 * d0 < zerolimit))
+      {
+    	  double dmt = dm / (dm + dn);
+      	  Tinv2[0] = zerolimit;
+      	  Tinv2[1] = zerolimit + (int)((invprd2 - 2*zerolimit) * dmt);
+      	  Tinv2[2] = invprd2 - zerolimit;
+      }
+      else
+      {
+          Tinv2[0] = (int)(invprd2 * (d0));
+          Tinv2[1] = (int)(invprd2 * (dm + d0));
+          Tinv2[2] = (int)(invprd2 * (dm + dn + d0));
+      }
+
+      break;
+    }
+  case 5:
+    {
+      if (d0 < 0 || (invprd1 * d0 < zerolimit))
+      {
+    	  double dmt = dm / (dm + dn);
+    	  Tinv1[0] = zerolimit + (int)((invprd1 - 2*zerolimit) * dmt);
+    	  Tinv1[1] = invprd1 - zerolimit;
+    	  Tinv1[2] = zerolimit;
+      }
+      else
+      {
+          Tinv1[0] = (int)(invprd1 * (dm + d0));
+          Tinv1[1] = (int)(invprd1 * (dm + dn + d0));
+          Tinv1[2] = (int)(invprd1 * (d0));
+      }
+
+      if (d0 < 0 || (invprd2 * d0 < zerolimit))
+      {
+    	  double dnt = dn / (dm + dn);
+    	  Tinv2[0] = zerolimit + (int)((invprd2 - 2*zerolimit) * dnt);
+    	  Tinv2[1] = zerolimit;
+    	  Tinv2[2] = invprd2 - zerolimit;
+      }
+      else
+      {
+          Tinv2[0] = (int)(invprd2 * (dn + d0));
+          Tinv2[1] = (int)(invprd2 * (d0));
+          Tinv2[2] = (int)(invprd2 * (dm + dn + d0));
+      }
+
+      break;
+    }
+  case 6:
+    {
+      if (d0 < 0 || (invprd1 * d0 < zerolimit))
+      {
+    	  double dnt = dn / (dm + dn);
+    	  Tinv1[0] = zerolimit;
+    	  Tinv1[1] = invprd1 - zerolimit;
+    	  Tinv1[2] = zerolimit + (int)((invprd1 - 2*zerolimit) * dnt);
+      }
+      else
+      {
+          Tinv1[0] = (int)(invprd1 * (d0));
+          Tinv1[1] = (int)(invprd1 * (dm + dn + d0));
+          Tinv1[2] = (int)(invprd1 * (dn + d0));
+      }
+
+      if (d0 < 0 || (invprd2 * d0 < zerolimit))
+      {
+    	  double dmt = dm / (dm + dn);
+    	  Tinv2[0] = invprd2 - zerolimit;
+    	  Tinv2[1] = zerolimit;
+    	  Tinv2[2] = zerolimit + (int)((invprd2 - 2*zerolimit) * dmt);
+      }
+      else
+      {
+          Tinv2[0] = (int)(invprd2 * (dm + dn + d0));
+          Tinv2[1] = (int)(invprd2 * (d0));
+          Tinv2[2] = (int)(invprd2 * (dm + d0));
+      }
+
+      break;
+    }
+  default:
+    {
+      Tinv1[0] = invprd1 + 1;
+      Tinv1[1] = invprd1 + 1;
+      Tinv1[2] = invprd1 + 1;
+      Tinv2[0] = invprd2 + 1;
+      Tinv2[1] = invprd2 + 1;
+      Tinv2[2] = invprd2 + 1;
+    }
+  }
 }
 
 /******************************************************************************
-@brief   Auxiliary Function
+@brief   RAMP -- 增量式斜坡函数
+
+@param   ramp -- 斜率
+         initial -- 应变量起始值
+         increment -- 自变量增量
+         Hlimit -- 上限
+         Llimit -- 下限
+
+@return  应变量终值
 ******************************************************************************/
-double roundn(double input, int digit)
+double RAMP(double ramp, double initial, double increment, double Hlimit, double Llimit)
+{
+  double temp = ramp * increment + initial;
+  if (temp > Hlimit)
+    return Hlimit;
+  else if (temp < Llimit)
+    return Llimit;
+  else
+    return temp;
+}
+
+/******************************************************************************
+@brief   roundn -- 有理数取指定位数
+
+@param   input -- 输入
+         digit -- 保留小数点后位数
+
+@return  舍弃指定位数后的值
+******************************************************************************/
+double roundn(double input, int _digit)
 {
   double temp;
-  temp = input * pow(10, digit);
+  temp = input * _digit;
   temp = floor(temp);
-  temp = temp / (pow(10, digit) * 1.0);
+  temp = temp / _digit;
   return temp;
 }

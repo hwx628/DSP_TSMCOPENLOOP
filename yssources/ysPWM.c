@@ -12,6 +12,23 @@
 |-------------------------------------------------------------------------------------------*/
 void InitPWM()
 {
+	EALLOW;
+
+	GpioCtrlRegs.GPAMUX1.bit.GPIO0 = 1; // GPIO 初始化为epwm输出
+	GpioCtrlRegs.GPAMUX1.bit.GPIO1 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO2 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO3 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO4 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO5 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO6 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO7 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO8 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO9 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO10 = 1;
+	GpioCtrlRegs.GPAMUX1.bit.GPIO11 = 1;
+
+	EDIS;
+
 /* Grid Side */
 
 	// ----------------EPwm1---------------------
