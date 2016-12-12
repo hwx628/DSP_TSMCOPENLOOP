@@ -12,23 +12,6 @@
 |-------------------------------------------------------------------------------------------*/
 void InitPWM()
 {
-	EALLOW;
-
-	GpioCtrlRegs.GPAMUX1.bit.GPIO0 = 1; // GPIO 初始化为epwm输出
-	GpioCtrlRegs.GPAMUX1.bit.GPIO1 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO2 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO3 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO4 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO5 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO6 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO7 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO8 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO9 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO10 = 1;
-	GpioCtrlRegs.GPAMUX1.bit.GPIO11 = 1;
-
-	EDIS;
-
 /* Grid Side */
 
 	// ----------------EPwm1---------------------
@@ -54,7 +37,7 @@ void InitPWM()
 	EPwm1Regs.DBCTL.bit.OUT_MODE = DB_DISABLE;  // 上下不互补，死区关闭
 
 	EPwm1Regs.ETSEL.bit.INTEN = 1;  // 使能EPwm1中断
-	EPwm1Regs.ETSEL.bit.INTSEL = ET_CTR_PRD;  // TBCTR = 0触发中断
+	EPwm1Regs.ETSEL.bit.INTSEL = ET_CTR_PRD;  // TBCTR = period触发中断
 	EPwm1Regs.ETPS.bit.INTPRD = ET_1ST;  // 每次中断都响应
 
 	   // ----------------EPwm2---------------------
@@ -123,12 +106,11 @@ void InitPWM()
 
 	EPwm4Regs.AQCTLA.bit.CAU = AQ_TOGGLE;
 
-	//EPwm4Regs.DBCTL.bit.IN_MODE = DBB_RED_DBA_FED;
 	EPwm4Regs.DBCTL.bit.IN_MODE = DBA_ALL;
 	EPwm4Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;  // A不翻转，B翻转
 	EPwm4Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-	EPwm4Regs.DBRED = 300; // Deadzone
-	EPwm4Regs.DBFED = 300;
+	EPwm4Regs.DBRED = DT; // Deadzone
+	EPwm4Regs.DBFED = DT;
 
 	EPwm4Regs.ETSEL.bit.INTEN = 1;  // 使能EPwm1中断
 	EPwm4Regs.ETSEL.bit.INTSEL = ET_CTR_PRD;  // TBCTR = 0触发中断
@@ -156,8 +138,8 @@ void InitPWM()
 	EPwm5Regs.DBCTL.bit.IN_MODE = DBA_ALL;
 	EPwm5Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;  // A不翻转，B翻转
 	EPwm5Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-	EPwm5Regs.DBRED = 300; // Deadzone
-	EPwm5Regs.DBFED = 300;
+	EPwm5Regs.DBRED = DT; // Deadzone
+	EPwm5Regs.DBFED = DT;
 
 	// ----------------EPwm6---------------------
 	EPwm6Regs.TBPHS.half.TBPHS = 0;  // 时基周期寄存器
@@ -181,24 +163,23 @@ void InitPWM()
 	EPwm6Regs.DBCTL.bit.IN_MODE = DBA_ALL;
 	EPwm6Regs.DBCTL.bit.POLSEL = DB_ACTV_HIC;  // A不翻转，B翻转
 	EPwm6Regs.DBCTL.bit.OUT_MODE = DB_FULL_ENABLE;
-	EPwm6Regs.DBRED = 300; // Deadzone
-	EPwm6Regs.DBFED = 300;
+	EPwm6Regs.DBRED = DT; // Deadzone
+	EPwm6Regs.DBFED = DT;
 
 	// ----------------开始计时---------------------
 	EPwm1Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;  // 向上计数
 	EPwm2Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;
 	EPwm3Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;
-	//EPwm4Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;
+	EPwm4Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;
 	EPwm5Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;
 	EPwm6Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;
-	EPwm4Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP;
+
 	EPwm1Regs.TBPRD = period;  // 周期设置
 	EPwm2Regs.TBPRD = period;
 	EPwm3Regs.TBPRD = period;
-	//EPwm4Regs.TBPRD = period / 2;
+	EPwm4Regs.TBPRD = period / 2;
 	EPwm5Regs.TBPRD = period / 2;
 	EPwm6Regs.TBPRD = period / 2;
-	EPwm4Regs.TBPRD = period / 2;
 
 	EPwm4Regs.AQSFRC.bit.ACTSFA = AQ_CLEAR;
 	EPwm5Regs.AQSFRC.bit.ACTSFA = AQ_CLEAR;

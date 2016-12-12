@@ -15,6 +15,8 @@ double drec;  // 整流占空比
 Uint16 dutycycle;  // 整流占空比（时钟数）
 Uint16 rec_sector;
 
+double Angle = 0;
+
 /******************************************************************************
 @brief  Main
 ******************************************************************************/
@@ -43,7 +45,7 @@ void main()
    InitSPI();
    InitCpuTimers();  // 计算转速和转速给定值
 
-   ConfigCpuTimer(&CpuTimer0, 150, 100000);  // 100ms
+   ConfigCpuTimer(&CpuTimer0, 150, 1000);  // 100ms
    CpuTimer0Regs.TCR.all = 0x4001; // Use write-only instruction to set TSS bit = 0
 	
    IER |= M_INT3;  // enable ePWM CPU_interrupt
@@ -68,21 +70,6 @@ interrupt void epwm1_timer_isr(void)
 {
 	int Sa, Sb, Sc;
 
-	/* 第二阶段寄存器设置， 时间 < invprd1 */
-	while(EPwm4Regs.ETFLG.bit.INT == 1)
-		EPwm4Regs.ETCLR.bit.INT = 1;
-
-	EPwm4Regs.TBPRD = invprd2;
-	EPwm5Regs.TBPRD = invprd2;
-	EPwm6Regs.TBPRD = invprd2;
-	EPwm4Regs.CMPA.half.CMPA = Tinv2[0];
-	EPwm5Regs.CMPA.half.CMPA = Tinv2[1];
-	EPwm6Regs.CMPA.half.CMPA = Tinv2[2];
-
-	/* 整流部分*/
-
-	//DELAY_US(1);  // 整流开关切换死区
-
 	// ----------------强制输出初始值---------------------
 	EPwm4Regs.AQSFRC.bit.OTSFA = 1;
 	EPwm5Regs.AQSFRC.bit.OTSFA = 1;
@@ -94,6 +81,21 @@ interrupt void epwm1_timer_isr(void)
 	EPwm2Regs.AQSFRC.bit.OTSFB = 1;
 	EPwm3Regs.AQSFRC.bit.OTSFA = 1;
 	EPwm3Regs.AQSFRC.bit.OTSFB = 1;
+
+	/* 逆变级第二阶段寄存器设置， 时间 <invprd1 */
+	EPwm4Regs.TBPRD = invprd2;
+	EPwm5Regs.TBPRD = invprd2;
+	EPwm6Regs.TBPRD = invprd2;
+	EPwm4Regs.CMPA.half.CMPA = Tinv2[0];
+	EPwm5Regs.CMPA.half.CMPA = Tinv2[1];
+	EPwm6Regs.CMPA.half.CMPA = Tinv2[2];
+
+	while(EPwm4Regs.ETFLG.bit.INT == 1)
+		EPwm4Regs.ETCLR.bit.INT = 1;
+
+	/* 整流部分*/
+
+	//DELAY_US(0.5);  // 整流开关切换死区
 
 	// Clear INT flag for this timer
 	EPwm1Regs.ETCLR.bit.INT = 1;
@@ -138,9 +140,15 @@ interrupt void epwm1_timer_isr(void)
     	   drec = -uabc.b / uabc.a;
     	   dutycycle = (int)(drec * period);
     	   if (dutycycle  <= limitclk)
+    	   {
     		   dutycycle = limitclk;
+    		   drec = 0.025;  // limitclk / period = 0.05
+    	   }
     	   else if (period - dutycycle <= limitclk || period <= dutycycle)
+    	   {
     		   dutycycle = period - limitclk;
+    		   drec = 0.975;
+    	   }
 
     	   Ud = drec * Uab - (1 - drec) * Uca;
 
@@ -165,9 +173,15 @@ interrupt void epwm1_timer_isr(void)
            drec = -uabc.b / uabc.c;
      	   dutycycle = (int)(drec * period);
     	   if (dutycycle  <= limitclk)
+    	   {
     		   dutycycle = limitclk;
+    		   drec = 0.025;  // limitclk / period = 0.05
+    	   }
     	   else if (period - dutycycle <= limitclk || period <= dutycycle)
+    	   {
     		   dutycycle = period - limitclk;
+    		   drec = 0.975;
+    	   }
 
     	   Ud = drec * Ubc - (1 - drec) * Uca;
 
@@ -192,9 +206,15 @@ interrupt void epwm1_timer_isr(void)
            drec = -uabc.c / uabc.b;
      	   dutycycle = (int)(drec * period);
     	   if (dutycycle  <= limitclk)
+    	   {
     		   dutycycle = limitclk;
+    		   drec = 0.025;  // limitclk / period = 0.05
+    	   }
     	   else if (period - dutycycle <= limitclk || period <= dutycycle)
+    	   {
     		   dutycycle = period - limitclk;
+    		   drec = 0.975;
+    	   }
 
     	   Ud = drec * Ubc - (1 - drec) * Uab;
 
@@ -218,9 +238,15 @@ interrupt void epwm1_timer_isr(void)
            drec = -uabc.c / uabc.a;
      	   dutycycle = (int)(drec * period);
     	   if (dutycycle  <= limitclk)
+    	   {
     		   dutycycle = limitclk;
+    		   drec = 0.025;  // limitclk / period = 0.05
+    	   }
     	   else if (period - dutycycle <= limitclk || period <= dutycycle)
+    	   {
     		   dutycycle = period - limitclk;
+    		   drec = 0.975;
+    	   }
 
     	   Ud = drec * Uca - (1 - drec) * Uab;
 
@@ -244,9 +270,15 @@ interrupt void epwm1_timer_isr(void)
            drec = -uabc.a / uabc.c;
      	   dutycycle = (int)(drec * period);
     	   if (dutycycle  <= limitclk)
+    	   {
     		   dutycycle = limitclk;
+    		   drec = 0.025;  // limitclk / period = 0.05
+    	   }
     	   else if (period - dutycycle <= limitclk || period <= dutycycle)
+    	   {
     		   dutycycle = period - limitclk;
+    		   drec = 0.975;
+    	   }
 
     	   Ud = drec * Uca - (1 - drec) * Ubc;
 
@@ -270,9 +302,15 @@ interrupt void epwm1_timer_isr(void)
            drec = -uabc.a / uabc.b;
      	   dutycycle = (int)(drec * period);
     	   if (dutycycle  <= limitclk)
+    	   {
     		   dutycycle = limitclk;
+    		   drec = 0.025;  // limitclk / period = 0.05
+    	   }
     	   else if (period - dutycycle <= limitclk || period <= dutycycle)
+    	   {
     		   dutycycle = period - limitclk;
+    		   drec = 0.975;
+    	   }
 
     	   Ud = drec * Uab - (1 - drec) * Ubc;
 
@@ -319,8 +357,8 @@ interrupt void epwm1_timer_isr(void)
    	invprd2 = period - invprd1;
 
     /* SVM开环计算 */
-    //u_cmd = RAMP(VSpdramp, 0, spd_cmd, Ud, Voltlimit_L);
-   	u_cmd = 0.9 * Ud;
+    u_cmd = RAMP(VSpdramp, 0, spd_cmd, Ud, Voltlimit_L);
+   	//u_cmd = 20;
     theta += 0.0000418879 * spd_cmd; // theta += 2 * pi * (spd_cmd / 30.0) * 0.0002;
     if (theta > 6.2831852)  // 2 * pi = 6.2831852
       theta -= 6.2831852;
@@ -338,6 +376,10 @@ interrupt void epwm1_timer_isr(void)
    	EPwm5Regs.CMPA.half.CMPA = Tinv1[1];
    	EPwm6Regs.CMPA.half.CMPA = Tinv1[2];
 
+/*   	msg[0] = (int)(Uab * 1e5);
+   	msg[2] = (int)(Uca * 1e5);
+   	sciNumber(msg);*/
+
    // Clear INT flag for this timer
    	while(EPwm1Regs.ETFLG.bit.INT == 1)
    		EPwm1Regs.ETCLR.bit.INT = 1;
@@ -352,17 +394,17 @@ interrupt void ISRTimer0(void)
 	if (CpuTimer0.InterruptCount  > 15) CpuTimer0.InterruptCount -= 16;
 
 	// SCI
-/*	int temp;
+	int temp;
 	temp = floor(sin(Angle) * 100 + 100);
 	Angle += 2 * pi * 50 * 0.001;
 	if (Angle > 2 * pi)      Angle -= 2*pi;
 
 	int msg[SCINumSend]; // {n1, n2, torque, ia, ib, id, iq, lambdard, lambdarq};
 	int i;
-	for (i = 0; i < SCINumSend; i++)
-		msg[i] = temp;
+	for (i = 0; i < SCINumSend; i++) //msg[i] = (int)(-20.51 * 10);
+		msg[i] = 85;
 
-	sciNumber(msg);*/
+	sciNumber(msg);
 
 	// SPI
     //spiSend(CpuTimer0.InterruptCount);

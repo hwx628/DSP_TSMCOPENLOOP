@@ -47,14 +47,15 @@
 #define uqlimit_L -60
 
 /* speed ramp */
-#define spdramp 60  // 斜率
-#define spdlimit_H 450  // 转速上限
+#define spdramp 50  // 斜率
+#define spdlimit_H 500  // 转速上限
 #define spdlimit_L 0  // 转速下限
 
 /* V/spd curve */
-#define VSpdramp 0.024  // 斜率
-#define Voltlimit_H 40  // 电压上限
-#define Voltlimit_L 5  // 电压下限
+//#define VSpdramp 0.38386  // 斜率
+#define VSpdramp 0.15  // 斜率
+#define Voltlimit_H 100  // 电压上限
+#define Voltlimit_L 10  // 电压下限
 
 /* auxiliary */
 #define pi 3.1415926

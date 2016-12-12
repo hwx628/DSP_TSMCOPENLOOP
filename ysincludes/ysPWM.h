@@ -7,11 +7,11 @@
 /******************************************************************************
 | defines
 |--------------------------------------------------------------------------------------------*/
-//#define period				7500  // 10KHz对应时钟数，TBCLK = SYSCLKOUT
-#define period				15000  // 10KHz对应时钟数，TBCLK = SYSCLKOUT(for test)
+//#define period				15000  // 10KHz对应时钟数，TBCLK = SYSCLKOUT
+#define period				30000  // 5KHz对应时钟数，TBCLK = SYSCLKOUT(for test)
 #define prediv				0  // 预分频
-#define limitclk				1500  // 10us——整流两段最小时间
-#define zerolimit				600  //
+#define limitclk				750  // 5us——整流两段最小时间
+#define zerolimit				150  // 逆变SVM零矢量半段最小时间
 #define DT				150   // 死区
 
 /******************************************************************************

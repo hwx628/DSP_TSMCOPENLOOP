@@ -39,7 +39,7 @@ PHASE_DQ udq_cmd = {0, 0};
 PHASE_DQ idq_cmd = {0, 0};
   // 转速
 double spd_cmd = 0;  // 转速给定
-double spd_req = 450;  // 转速设定
+double spd_req = 300;  // 转速设定
 
 /* PI 变量 */
 double idlasterr = 0;

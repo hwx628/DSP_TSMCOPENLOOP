@@ -20,10 +20,10 @@ void InitSCI()
 
 	//ScibRegs.SCIHBAUD = 0x0000;  // 115200 baud @LSPCLK = 37.5MHz.
 	//ScibRegs.SCILBAUD = 0x0028;
-	ScibRegs.SCIHBAUD = 0x0000;  // 38400 baud @LSPCLK = 37.5MHz.
-	ScibRegs.SCILBAUD = 0x0079;
-	//ScibRegs.SCIHBAUD = 0x0001;  // 9600 baud @LSPCLK = 37.5MHz.
-	//ScibRegs.SCILBAUD = 0x00E7;
+	//ScibRegs.SCIHBAUD = 0x0000;  // 38400 baud @LSPCLK = 37.5MHz.
+	//ScibRegs.SCILBAUD = 0x0079;
+	ScibRegs.SCIHBAUD = 0x0001;  // 9600 baud @LSPCLK = 37.5MHz.
+	ScibRegs.SCILBAUD = 0x00E7;
 
 	ScibRegs.SCICTL2.bit.RXBKINTENA = 0; // ½ûÖ¹RXRDY\BRKDTÖÐ¶Ï
 	ScibRegs.SCICTL2.bit.TXINTENA = 0; // ½ûÖ¹TXRDYÖÐ¶Ï
