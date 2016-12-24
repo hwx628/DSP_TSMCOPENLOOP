@@ -25,8 +25,10 @@ PHASE_ALBE ialbe = {0, 0};
 PHASE_DQ idq = {0, 0};
   // ´ÅÁ´
 double lamdar = 0;
-PHASE_ALBE lamdaralbe = {0, 0};
+PHASE_ALBE lamdasalbe = {0, 0};
 double theta = 0;
+  // ×ª¾Ø
+double Te = 0;
   // ×ªËÙ
 double speed = 0;
 
@@ -161,8 +163,13 @@ void lamdaralbeCal(PHASE_ALBE ualbe, PHASE_ALBE ialbe, double *ualsum, double *u
   lamdaralbe->be = tempbe * Lr/Lm;
 }
 
-void lamdardqCal()
+/******************************************************************************
+@brief   Stator Flux Calculation
+******************************************************************************/
+void lamdasalbeCal(PHASE_ALBE ualbe, PHASE_ALBE ialbe, PHASE_ALBE *lamdasalbe)
 {
+	lamdasalbe->al = LPfilter(ualbe.al - Rs * ialbe.al, lamdasalbe->al, 1, Ts);
+	lamdasalbe->be = LPfilter(ualbe.be - Rs * ialbe.be, lamdasalbe->be, 1, Ts);
 }
 
 /******************************************************************************
@@ -205,6 +212,11 @@ double PImodule(double Kp, double Ki, double inputk, double err, double *lasterr
 double Integrator(double paramin, double sum, double ts)
 {
   return paramin * ts + sum;
+}
+
+double LPfilter(double paramin, double lasty, double wc, double ts)
+{
+  return (lasty + ts * wc * paramin) / (1 + ts * wc);
 }
 
 /******************************************************************************

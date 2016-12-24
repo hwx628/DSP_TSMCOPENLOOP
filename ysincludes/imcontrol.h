@@ -10,7 +10,7 @@
 | defines
 |----------------------------------------------------------------------------*/
 /* IM parameters */
-#define Rs 0.4
+#define Rs 4.0
 #define Ls 0.289368
 #define Rr 3.3278
 #define Lr 0.289368
@@ -19,7 +19,7 @@
 #define np 2
 
 /* control period */
-#define Ts 1e-4
+#define Ts 2e-4
 
 /* lamdar最小值限制 */
 #define lamdarlimit_L 0.01
@@ -48,7 +48,7 @@
 
 /* speed ramp */
 #define spdramp 50  // 斜率
-#define spdlimit_H 500  // 转速上限
+#define spdlimit_H 1000  // 转速上限
 #define spdlimit_L 0  // 转速下限
 
 /* V/spd curve */
@@ -95,8 +95,10 @@ extern PHASE_ALBE ialbe;
 extern PHASE_DQ idq;
   // 磁链
 extern double lamdar;
-extern PHASE_ALBE lamdaralbe;
+extern PHASE_ALBE lamdasalbe;
 extern double theta;
+  // 转矩
+extern double Te;
   // 转速
 extern double speed;
 
@@ -137,6 +139,9 @@ extern void R2toS2(PHASE_DQ dq, PHASE_ALBE *albe, double cosIn, double sinIn);
 /* calculate lamdar */  
 extern double lamdarCal(double lamdar, double ism);
 
+/* calculate lamdar */
+extern void lamdasalbeCal(PHASE_ALBE ualbe, PHASE_ALBE ialbe, PHASE_ALBE *lamdasalbe);
+
 /* calculate position and speed */  
 extern double wrCal_M();
 extern double positonCal(double wr, double lamdar, double ist, double theta);
@@ -144,6 +149,7 @@ extern double positonCal(double wr, double lamdar, double ist, double theta);
 /* PI module */  
 extern double PImodule(double Kp, double Ki, double uk, double err, double *lasterr, double Uplim, double Downlim);
 extern double Integrator(double paramin, double sum, double ts);
+extern double LPfilter(double paramin, double lasty, double wc, double ts);
 
 /* SVM */  
 extern void positionSVM();

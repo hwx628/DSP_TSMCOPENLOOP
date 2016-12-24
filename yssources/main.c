@@ -16,6 +16,17 @@ Uint16 dutycycle;  // 整流占空比（时钟数）
 Uint16 rec_sector;
 
 double Angle = 0;
+int indexDA = 7;
+double temp = 0;
+int count = 0;
+double ualsum = 0;
+double ubesum = 0;
+double ialsum = 0;
+double ibesum = 0;
+double lamdasalsum = 0;
+double lamdasbesum = 0;
+double av_al = 0;
+double av_be = 0;
 
 /******************************************************************************
 @brief  Main
@@ -45,7 +56,7 @@ void main()
    InitSPI();
    InitCpuTimers();  // 计算转速和转速给定值
 
-   ConfigCpuTimer(&CpuTimer0, 150, 1000);  // 100ms
+   ConfigCpuTimer(&CpuTimer0, 150, 100000);  // 100ms
    CpuTimer0Regs.TCR.all = 0x4001; // Use write-only instruction to set TSS bit = 0
 	
    IER |= M_INT3;  // enable ePWM CPU_interrupt
@@ -55,6 +66,7 @@ void main()
 
    EINT;   // 总中断 INTM 使能
    ERTM;   // Enable Global realtime interrupt DBGM
+
 
    int i;
    for(; ;)
@@ -376,9 +388,124 @@ interrupt void epwm1_timer_isr(void)
    	EPwm5Regs.CMPA.half.CMPA = Tinv1[1];
    	EPwm6Regs.CMPA.half.CMPA = Tinv1[2];
 
-/*   	msg[0] = (int)(Uab * 1e5);
-   	msg[2] = (int)(Uca * 1e5);
-   	sciNumber(msg);*/
+	/* 3s/2r coordinate transform */
+	S3toS2(uabc, &ualbe);
+	S3toS2(iabc, &ialbe);
+
+	/* stator flux calculation */
+	lamdasalbeCal(ualbe_cmd, ialbe, &lamdasalbe);
+	Te = 1.5 * np * (lamdasalbe.al * ialbe.be - lamdasalbe.be * ialbe.al);
+
+	switch(indexDA)
+	{
+		case 0:
+		{
+			DACout(0, uabc.a * 0.1);
+			DACout(1, uabc.b * 0.1);
+			DACout(2, uabc.c * 0.1);
+			break;
+		}
+		case 1:
+		{
+			ualsum += ualbe_cmd.al;
+			ubesum += ualbe_cmd.be;
+			count++;
+			if(count == 5000)
+			{
+				av_al = ualsum * 0.0002;
+			    av_be = ubesum * 0.0002;
+			    count = 0;
+			    ualsum = 0;
+			    ubesum = 0;
+			}
+			temp = ualbe_cmd.al * ualbe_cmd.al + ualbe_cmd.be * ualbe_cmd.be;
+			DACout(0, ualbe_cmd.al * 0.1);
+			DACout(1, ualbe_cmd.be * 0.1);
+			DACout(2, temp);
+			break;
+		}
+		case 2:
+		{
+			DACout(0, iabc.a * 5);
+			DACout(1, iabc.b * 5);
+			DACout(2, iabc.c * 5);
+			break;
+		}
+		case 3:
+		{
+			ialsum += ialbe.al;
+			ibesum += ialbe.be;
+			count++;
+			if(count == 5000)
+			{
+				av_al = ialsum * 0.0002;
+			    av_be = ibesum * 0.0002;
+			    count = 0;
+			    ialsum = 0;
+			    ibesum = 0;
+			}
+			DACout(0, ialbe.al * 5);
+			DACout(1, ialbe.be * 5);
+			DACout(2, ialbe.al * ialbe.al + ialbe.be * ialbe.be);
+			break;
+		}
+		case 4:
+		{
+			DACout(0, lamdasalbe.al * 8);
+			DACout(1, ialbe.al * 5);
+			DACout(2, lamdasalbe.al * lamdasalbe.al + lamdasalbe.be * lamdasalbe.be);
+			break;
+		}
+		case 5:
+		{
+			DACout(0, lamdasalbe.be * 8);
+			DACout(1, ialbe.be * 5);
+			DACout(2, lamdasalbe.al * lamdasalbe.al + lamdasalbe.be * lamdasalbe.be);
+			break;
+		}
+		case 6:
+		{
+			lamdasalsum += lamdasalbe.al;
+			lamdasbesum += lamdasalbe.be;
+			count++;
+			if(count == 5000)
+			{
+				av_al = lamdasalsum * 0.0002;
+			    av_be = lamdasbesum * 0.0002;
+			    count = 0;
+			    lamdasalsum = 0;
+			    lamdasbesum = 0;
+			}
+			temp = lamdasalbe.al * lamdasalbe.al + lamdasalbe.be * lamdasalbe.be;
+			DACout(0, lamdasalbe.al * 8);
+			DACout(1, lamdasalbe.be * 8);
+			DACout(2, temp);
+			break;
+		}
+		case 7:
+		{
+			DACout(0, Te);
+			DACout(1, lamdasalbe.be * 8);
+			DACout(2, temp);
+			break;
+		}
+		case 8:
+		{
+			DACout(0, 0);
+			DACout(1, 0);
+			DACout(2, 0);
+			count = 0;
+			ualsum = 0;
+			ubesum = 0;
+			ialsum = 0;
+			ibesum = 0;
+			lamdasalsum = 0;
+			lamdasbesum = 0;
+			av_al = 0;
+			av_be = 0;
+			break;
+		}
+	}
 
    // Clear INT flag for this timer
    	while(EPwm1Regs.ETFLG.bit.INT == 1)
@@ -394,25 +521,14 @@ interrupt void ISRTimer0(void)
 	if (CpuTimer0.InterruptCount  > 15) CpuTimer0.InterruptCount -= 16;
 
 	// SCI
-	int temp;
-	temp = floor(sin(Angle) * 100 + 100);
-	Angle += 2 * pi * 50 * 0.001;
-	if (Angle > 2 * pi)      Angle -= 2*pi;
-
-	int msg[SCINumSend]; // {n1, n2, torque, ia, ib, id, iq, lambdard, lambdarq};
-	int i;
-	for (i = 0; i < SCINumSend; i++) //msg[i] = (int)(-20.51 * 10);
-		msg[i] = 85;
-
-	sciNumber(msg);
 
 	// SPI
     //spiSend(CpuTimer0.InterruptCount);
 
-	  if (spd_cmd < spd_req)
-	  {
-	    spd_cmd = RAMP(spdramp, spd_cmd, 0.1, spdlimit_H, spdlimit_L);  // 转速给定值计算
-	  }
+	if (spd_cmd < spd_req)
+	{
+		spd_cmd = RAMP(spdramp, spd_cmd, 0.1, spdlimit_H, spdlimit_L);  // 转速给定值计算
+	}
 
 	// Acknowledge this interrupt to receive more interrupts from group 1
 	PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
